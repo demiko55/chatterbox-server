@@ -12,7 +12,26 @@ this file and include it in basic-server.js so that it actually works.
 
 **************************************************************/
 
-var requestHandler = function(request, response) {
+// These headers will allow Cross-Origin Resource Sharing (CORS).
+// This code allows this server to talk to websites that
+// are on different domains, for instance, your chat client.
+//
+// Your chat client is running from a url like file://your/chat/client/index.html,
+// which is considered a different domain.
+//
+// Another way to get around this restriction is to serve you chat
+// client from this domain by setting up static file serving.
+var defaultCorsHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'access-control-allow-headers': 'content-type, accept, authorization',
+  'access-control-max-age': 10 // Seconds.
+};
+
+var responseData = [];
+var querystring = require('querystring');
+
+var requestHandler = function (request, response) {
   // Request and Response come from node's http module.
   //
   // They include information about both the incoming request, such as
@@ -28,6 +47,7 @@ var requestHandler = function(request, response) {
   // debugging help, but you should always be careful about leaving stray
   // console.logs in your code.
   console.log('Serving request type ' + request.method + ' for url ' + request.url);
+  //console.log('REQUEST', request);
 
   // The outgoing status.
   var statusCode = 200;
@@ -39,11 +59,12 @@ var requestHandler = function(request, response) {
   //
   // You will need to change this if you are sending something
   // other than plain text, like JSON or HTML.
-  headers['Content-Type'] = 'text/plain';
+  headers['Content-Type'] = 'application/json';
 
   // .writeHead() writes to the request line and headers of the response,
   // which includes the status and all headers.
-  response.writeHead(statusCode, headers);
+
+  //response.writeHead(statusCode, headers);
 
   // Make sure to always call response.end() - Node may not send
   // anything back to the client until you do. The string you pass to
@@ -52,21 +73,39 @@ var requestHandler = function(request, response) {
   //
   // Calling .end "flushes" the response's internal buffer, forcing
   // node to actually send all the data over to the client.
-  response.end('Hello, World!');
+
+  //response.end('Hello, World!');
+  if ((request.method === 'GET' || request.method === 'OPTIONS') && request.url === '/classes/messages') {
+    response.writeHead(200, headers);
+    response.end(JSON.stringify(responseData));
+  } else if (request.method === 'POST' && request.url === '/classes/messages') {
+    let data = [];
+    request.on('data', (chunk) => {
+      data.push(chunk);
+    }).on('end', () => {
+      //https://www.runoob.com/nodejs/nodejs-buffer.html
+      data = Buffer.concat(data).toString();
+      data = querystring.parse(data);
+      data = Object.keys(data)[0];
+      data = JSON.parse(data);
+      data['message_id'] = Date.now();
+      responseData.push(data);
+      console.log('responseData', responseData);
+      response.writeHead(201, headers);
+      response.end(JSON.stringify(responseData));
+    });
+
+  } else {
+    response.writeHead(404, headers);
+    response.end(JSON.stringify(responseData));
+  }
 };
 
-// These headers will allow Cross-Origin Resource Sharing (CORS).
-// This code allows this server to talk to websites that
-// are on different domains, for instance, your chat client.
-//
-// Your chat client is running from a url like file://your/chat/client/index.html,
-// which is considered a different domain.
-//
-// Another way to get around this restriction is to serve you chat
-// client from this domain by setting up static file serving.
-var defaultCorsHeaders = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'access-control-allow-headers': 'content-type, accept, authorization',
-  'access-control-max-age': 10 // Seconds.
+
+var a = 0;
+// console.log('here!!!');
+exports.requestHandler = requestHandler;
+exports.increment = function () {
+  // a += 1;
+  return a;
 };
